@@ -48,6 +48,10 @@ FROM nvcr.io/nvidia/pytorch:24.12-py3 AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 SHELL ["/bin/bash", "-c"]
 
+# Ensure HPC-X UCX/UCC libraries stay ahead of the distro copies so PyTorch
+# links against a consistent stack after installing COLMAP dependencies.
+ENV LD_LIBRARY_PATH=/opt/hpcx/ucx/lib:/opt/hpcx/ucc/lib:/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/torch_tensorrt/lib:/usr/local/cuda/compat/lib:/usr/local/cuda/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/lib:/usr/lib:${LD_LIBRARY_PATH}
+
 # Limit CUDA archs for PyTorch extensions to common GPUs
 # PyTorch expects dotted compute capabilities (e.g., 7.0, 8.6)
 # ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6"
