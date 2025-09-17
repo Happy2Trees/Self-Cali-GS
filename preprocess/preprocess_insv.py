@@ -18,6 +18,13 @@ def positive_int(value: str) -> int:
     return ivalue
 
 
+def positive_float(value: str) -> float:
+    fvalue = float(value)
+    if fvalue <= 0:
+        raise argparse.ArgumentTypeError("value must be > 0")
+    return fvalue
+
+
 def require_binaries() -> None:
     missing = [tool for tool in ("ffmpeg", "ffprobe") if shutil.which(tool) is None]
     if missing:
@@ -88,6 +95,7 @@ def extract_frames(
     image_format: str,
     overwrite: bool,
     max_frames: int | None,
+    resize: float,
 ) -> None:
     if not video_path.exists():
         print(f"  Skipping frames; source missing: {video_path}")
@@ -99,7 +107,11 @@ def extract_frames(
     frame_dir.mkdir(parents=True, exist_ok=True)
     pattern = frame_dir / f"%06d.{image_format}"
 
-    filter_expr = f"select=not(mod(n\\,{frame_interval}))"
+    filter_parts = [f"select=not(mod(n\\,{frame_interval}))"]
+    if abs(resize - 1.0) > 1e-9:
+        resize_expr = f"{resize:g}"
+        filter_parts.append(f"scale=iw*{resize_expr}:ih*{resize_expr}")
+    filter_expr = ",".join(filter_parts)
     cmd = [
         "ffmpeg",
         "-hide_banner",
@@ -153,6 +165,12 @@ def parse_args() -> argparse.Namespace:
         help="Image format/extension for frames (lossless formats such as png/tiff).",
     )
     parser.add_argument(
+        "--resize",
+        type=positive_float,
+        default=1.0,
+        help="Uniform scale factor for exported frames (e.g., 0.5 halves resolution).",
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Overwrite existing MP4 and frame files.",
@@ -186,7 +204,8 @@ def main() -> None:
 
     for label, stream_index, required in stream_configs:
         mp4_path = output_root / f"{base_name}_{label}.mp4"
-        frames_dir = output_root / f"{base_name}_{label}_frames"
+        frames_root = output_root / f"{base_name}_{label}_frames"
+        frames_dir = frames_root / "input"
 
         if not video_stream_exists(insv_path, stream_index):
             if required:
@@ -202,6 +221,7 @@ def main() -> None:
             args.image_format,
             args.overwrite,
             args.max_frames,
+            args.resize,
         )
 
 
